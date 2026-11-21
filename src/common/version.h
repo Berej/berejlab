@@ -1,0 +1,6 @@
+#ifndef BEREJLAB_COMMON_VERSION_H
+#define BEREJLAB_COMMON_VERSION_H
+
+#define BEREJLAB_VERSION "0.1.0-dev"
+
+#endif

@@ -1,0 +1,27 @@
+# Build output and development state
+build/
+.dev/
+
+# Compiler leftovers outside build/
+*.o
+*.d
+*.a
+a.out
+core
+core.*
+vgcore.*
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+.clangd/
+.cache/
+compile_commands.json
+
+# OS
+.DS_Store
+Thumbs.db
