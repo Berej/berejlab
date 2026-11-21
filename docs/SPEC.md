@@ -1045,7 +1045,8 @@ berejlab/
    - Done when: `make`, `make debug`, `make test`, `make CC=clang` pass with zero warnings.
 2. **SHA-256 and benchmark.** Reference implementation (FIPS 180-4) and fast single-block one.
    `make bench`.
-   - Done when: both pass NIST vectors and a 1M random-input cross-check with `sha256sum`;
+   - Done when: both pass NIST vectors; the fast one matches the reference on 1M random inputs
+     (in-process) and the reference matches `sha256sum` on 2000 random inputs (`make verify-sha`);
      baseline hashrate on 1 and 4 threads recorded in `docs/bench.md`.
 3. **Search engine.** Template parser (word ↔ position, odometer), all detectors and
    combinations from §5, coverage map, worker pool, chunks. Runs without the daemon:

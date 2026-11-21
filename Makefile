@@ -63,6 +63,9 @@ DAEMON_SRCS := $(wildcard src/daemon/*.c)
 CLIENT_SRCS := $(wildcard src/client/*.c)
 # Every tests/test_*.c is picked up automatically; runner.c holds main().
 TEST_SRCS   := tests/runner.c $(wildcard tests/test_*.c)
+# Development tools, built on demand and never installed.
+BENCH_SRCS   := tests/bench_sha256.c
+REFTOOL_SRCS := tests/sha256_ref_tool.c
 
 obj = $(patsubst %.c,$(OBJDIR)/%.o,$(1))
 
@@ -70,12 +73,21 @@ COMMON_OBJS := $(call obj,$(COMMON_SRCS))
 DAEMON_OBJS := $(call obj,$(DAEMON_SRCS))
 CLIENT_OBJS := $(call obj,$(CLIENT_SRCS))
 TEST_OBJS   := $(call obj,$(TEST_SRCS))
+BENCH_OBJS   := $(call obj,$(BENCH_SRCS))
+REFTOOL_OBJS := $(call obj,$(REFTOOL_SRCS))
 
 DAEMON_BIN := $(OUT)/berejlabd
 CLIENT_BIN := $(OUT)/berejlab
 TEST_BIN   := $(OUT)/test_runner
+BENCH_BIN   := $(OUT)/bench_sha256
+REFTOOL_BIN := $(OUT)/sha256_ref_tool
 
-ALL_OBJS := $(COMMON_OBJS) $(DAEMON_OBJS) $(CLIENT_OBJS) $(TEST_OBJS)
+ALL_OBJS := $(COMMON_OBJS) $(DAEMON_OBJS) $(CLIENT_OBJS) $(TEST_OBJS) $(BENCH_OBJS) \
+            $(REFTOOL_OBJS)
+
+# The benchmark runs threads and reports the flags it was built with.
+$(BENCH_OBJS): EXTRA_CFLAGS := -pthread -DBENCH_CFLAGS='"$(ALL_CFLAGS)"'
+BENCH_ARGS ?=
 
 # Rebuild everything when the compiler or flags change (e.g. `make` then `make CC=clang`),
 # otherwise stale objects from another compiler would be silently reused.
@@ -86,6 +98,8 @@ FLAGS_LINE  := $(CC) | $(ALL_CFLAGS) | $(ALL_LDFLAGS) | $(LDLIBS)
 DAEMON_LIST := $(OUT)/.berejlabd.objs
 CLIENT_LIST := $(OUT)/.berejlab.objs
 TEST_LIST   := $(OUT)/.test_runner.objs
+BENCH_LIST   := $(OUT)/.bench_sha256.objs
+REFTOOL_LIST := $(OUT)/.sha256_ref_tool.objs
 
 # $(call write_if_changed,file,content): touch the stamp only when its content differs.
 define write_if_changed
@@ -97,7 +111,7 @@ endef
 # Targets
 # ---------------------------------------------------------------------------
 
-.PHONY: all debug test bench run-dev install uninstall clean FORCE
+.PHONY: all debug test bench verify-sha run-dev install uninstall clean FORCE
 
 all: $(DAEMON_BIN) $(CLIENT_BIN)
 
@@ -107,8 +121,12 @@ debug:
 test: $(TEST_BIN)
 	@./$(TEST_BIN)
 
-bench:
-	@echo "make bench: not implemented yet (stage 2)"
+# BENCH_ARGS is passed through, e.g. make bench BENCH_ARGS="--threads 4 --seconds 10".
+bench: $(BENCH_BIN)
+	@./$(BENCH_BIN) $(BENCH_ARGS)
+
+verify-sha: $(REFTOOL_BIN)
+	@tests/verify_sha256.sh $(REFTOOL_BIN)
 
 run-dev:
 	@echo "make run-dev: not implemented yet (stage 4)"
@@ -131,6 +149,12 @@ $(CLIENT_BIN): $(CLIENT_OBJS) $(COMMON_OBJS) $(CLIENT_LIST)
 $(TEST_BIN): $(TEST_OBJS) $(COMMON_OBJS) $(TEST_LIST)
 	$(CC) $(ALL_LDFLAGS) -o $@ $(filter %.o,$^) $(LDLIBS)
 
+$(BENCH_BIN): $(BENCH_OBJS) $(COMMON_OBJS) $(BENCH_LIST)
+	$(CC) $(ALL_LDFLAGS) -pthread -o $@ $(filter %.o,$^) $(LDLIBS)
+
+$(REFTOOL_BIN): $(REFTOOL_OBJS) $(COMMON_OBJS) $(REFTOOL_LIST)
+	$(CC) $(ALL_LDFLAGS) -o $@ $(filter %.o,$^) $(LDLIBS)
+
 $(DAEMON_LIST): FORCE
 	$(call write_if_changed,$@,$(DAEMON_OBJS) $(COMMON_OBJS))
 
@@ -140,9 +164,15 @@ $(CLIENT_LIST): FORCE
 $(TEST_LIST): FORCE
 	$(call write_if_changed,$@,$(TEST_OBJS) $(COMMON_OBJS))
 
+$(BENCH_LIST): FORCE
+	$(call write_if_changed,$@,$(BENCH_OBJS) $(COMMON_OBJS))
+
+$(REFTOOL_LIST): FORCE
+	$(call write_if_changed,$@,$(REFTOOL_OBJS) $(COMMON_OBJS))
+
 $(OBJDIR)/tests/%.o: tests/%.c $(FLAGS_STAMP)
 	@mkdir -p $(@D)
-	$(CC) $(ALL_CFLAGS) -Itests $(DEP_FLAGS) -c -o $@ $<
+	$(CC) $(ALL_CFLAGS) $(EXTRA_CFLAGS) -Itests $(DEP_FLAGS) -c -o $@ $<
 
 $(OBJDIR)/%.o: %.c $(FLAGS_STAMP)
 	@mkdir -p $(@D)
